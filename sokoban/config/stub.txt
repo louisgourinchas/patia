@@ -1,0 +1,7 @@
+read width:int height:int boxCount:int
+loop height read line:string(30)
+
+gameloop
+read pusherX:int pusherY:int
+loop boxCount read boxX:int boxY:int
+write U

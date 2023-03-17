@@ -1,0 +1,8 @@
+{
+	"title": {
+		"2": "Scoria - Level 1"
+	},
+	"testIn": "  ####\n  #  #\n### .#\n#  * #\n# #@ #\n# $* #\n##   #\n #####",
+	"isTest": "true",
+	"isValidator": "true"
+}
