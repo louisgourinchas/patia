@@ -1,3 +1,7 @@
+PATIA:
+See [this readme](google.com) for more information on how each class works
+
+
 Play the game on [CodinGame](https://www.codingame.com/training/hard/sokoban)
 
 Maven is needed.
