@@ -1,3 +1,7 @@
+PATIA:
+See [this readme](https://github.com/louisgourinchas/patia_rendus/tree/main/sokoban/src/main/java/sokoban) for more information on how each class works
+
+
 Play the game on [CodinGame](https://www.codingame.com/training/hard/sokoban)
 
 Maven is needed.
