@@ -98,12 +98,6 @@ public class ASP extends AbstractPlanner {
         int midsize = fluents.size() + actions.size();
         int size = (midsize) * estimate;
 
-        // for(Action a : actions){
-        //     System.out.println(a.getName());
-        //     System.out.println(a.getPrecondition().toString());
-        //     System.out.println(a.getUnconditionalEffect().getPositiveFluents());
-        // }
-
         //starting to buld the general sat var array
         //Note: every SATVar id should be equal to it's index in variables
         SATVar[] variables;
@@ -128,20 +122,62 @@ public class ASP extends AbstractPlanner {
                 }
 
                 //add the effect
+                //an action at step i will have consequences at step i+1
+                //PROBLEM: consequances of actions at max step ?
                 s = actions.get(i).getUnconditionalEffect().getNegativeFluents().toString();
                 for(String fluentId : s.substring(1, s.length()-1).split(" ")){
-                    //an action at step i will have consequences at step i+1
-                    //TODO make negative
-                    variables[id].addEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
+                    variables[id].addNegEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
                 }
                 s = actions.get(i).getUnconditionalEffect().getPositiveFluents().toString();
                 for(String fluentId : s.substring(1, s.length()-1).split(" ")){
-                    //an action at step i will have consequences at step i+1
-                    variables[id].addEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
+                    variables[id].addPosEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
                 }
             }
         }
 
+        int[][] clauses;
+
+        //variables is done, we now need to build all the expressions
+        //start with initial state, expression is positivefluents AND negativefluents of initialstate
+        //step 0 fluents are located at the very start of variables.
+        initialState.getPositiveFluents();
+        initialState.getNegativeFluents();
+
+        //goal, expression is (positive fluent and not negativefluents)
+        //fluents for goal are located at the very last step so fluentid + (estimate-1)*midsize
+        problem.getGoal().getPositiveFluents();
+        problem.getGoal().getNegativeFluents();
+
+        //action expressions are of the form A -> B, whichi translates to -A v B
+        //of either we dont have the action, of we have it's consequences.
+        //B is of format {all preconds} and {all positive effects} and {not of all negative effects}
+        //note: effects are on step + 1
+        for(int step=0; step<estimate; step++){
+
+            for(int i=0;i<actions.size();i++){
+                //id of current action in varibles
+                int id = step*midsize + fluents.size() + i;
+            }
+        }
+
+        //state transitions: if you have fluent at step i and -fluent at ste i+1, construct an expression that is {OR of every actions that could have this effect}
+        //since is fi AND -fi+1 -> B, we end up with -(fi and -fi+1) OR B
+        //dont forget reverse: -fi and fi+1
+
+        //-1 steps because we cant have fi, fi+1 if i = max step.
+        for(int step=0; step<estimate; step++){
+
+            
+            for(int i=0;i<fluents.size();i++){
+                //if of curent mfluent in variables
+                int id = step*midsize + i;
+            }
+        }
+
+        //action disjonction: only one action is true at each step
+        //to confirm: iterate over all action pairs for every step and make expression of form -a OR -b
+
+        //ALL CLAUSES TO BE TRANSALTED TO "OR"
 
         // Creates the A* search strategy
         StateSpaceSearch search = StateSpaceSearch.getInstance(SearchStrategy.Name.ASTAR,

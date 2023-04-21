@@ -8,7 +8,8 @@ public class SATVar{
     private static final AtomicInteger count = new AtomicInteger(0); 
     private int id;
     private List<Integer> precond; 
-    private List<Integer> effects;  
+    private List<Integer> posEffects;  
+    private List<Integer> negEffects;  
 
     public SATVar(){
         int id = count.getAndIncrement();
@@ -18,7 +19,11 @@ public class SATVar{
         precond.add(id);
     }
 
-    public void addEffect(int id){
-        effects.add(id);
+    public void addPosEffect(int id){
+        posEffects.add(id);
+    }
+
+    public void addNegEffect(int id){
+        negEffects.add(id);
     }
 }
