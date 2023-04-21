@@ -15,11 +15,22 @@ import fr.uga.pddl4j.problem.State;
 import fr.uga.pddl4j.problem.operator.Action;
 import fr.uga.pddl4j.util.BitVector;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.swing.plaf.synth.SynthSplitPaneUI;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import picocli.CommandLine;
 
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
+
+import org.sat4j.specs.ISolver;
+import org.sat4j.minisat.SolverFactory;
+import org.sat4j.core.VecInt;
+import org.sat4j.specs.IProblem;
 /**
  * The class is an example. It shows how to create a simple A* search planner able to
  * solve an ADL problem by choosing the heuristic to used and its weight.
@@ -75,8 +86,6 @@ public class ASP extends AbstractPlanner {
      */
     @Override
     public Plan solve(final Problem problem) {
-        //i am making soup
-        System.out.println("\n\nThis is where i make my soup.\n\n");
 
         /* temporary notes on what ive learned
          * predicates: the actions that can be taken (as in, archetypes of actions)
@@ -93,18 +102,19 @@ public class ASP extends AbstractPlanner {
         int estimate = ff.estimate(initialState, problem.getGoal());
         System.out.println("estimated number of steps from initial state: " + estimate);
 
+        //variable initialization
         List<Fluent> fluents = problem.getFluents();
         List<Action> actions = problem.getActions();
         int midsize = fluents.size() + actions.size();
-        int size = (midsize) * estimate;
+        int size = (midsize * (estimate-1)) + fluents.size();
 
         //starting to buld the general sat var array
         //Note: every SATVar id should be equal to it's index in variables
         SATVar[] variables;
         variables = new SATVar[size];
 
-        //iterating over every fluent and every action, for every step
-        for(int step=0; step<estimate; step++){
+        //iterating over every fluent and every action, for every step except the final one
+        for(int step=0; step<estimate-1; step++){
             for(int i=0;i<fluents.size();i++){
                 variables[step*midsize + i] = new SATVar();
                 //fluents have no precond/effect to add
@@ -115,86 +125,224 @@ public class ASP extends AbstractPlanner {
                 variables[id] = new SATVar();
 
                 //add the precondition (our preconditions only even have positive fluents)
-                String s = actions.get(i).getPrecondition().getPositiveFluents().toString();
-                for(String fluentId : s.substring(1, s.length()-1).split(" ")){
+                String tempString = actions.get(i).getPrecondition().getPositiveFluents().toString();
+                for(String fluentId : tempString.substring(1, tempString.length()-1).split(",")){
                     //an action at step i will require preconditions to be true at step i
-                    variables[id].addPreCond(Integer.parseInt(fluentId + (step*midsize)));
+                    variables[id].addPreCond(Integer.parseInt(fluentId.trim()) + (step*midsize));
                 }
 
                 //add the effect
                 //an action at step i will have consequences at step i+1
-                //PROBLEM: consequances of actions at max step ?
-                s = actions.get(i).getUnconditionalEffect().getNegativeFluents().toString();
-                for(String fluentId : s.substring(1, s.length()-1).split(" ")){
-                    variables[id].addNegEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
+                tempString = actions.get(i).getUnconditionalEffect().getNegativeFluents().toString();
+                for(String fluentId : tempString.substring(1, tempString.length()-1).split(",")){
+                    variables[id].addNegEffect( Integer.parseInt(fluentId.trim()) + ((step+1)*midsize) );
                 }
-                s = actions.get(i).getUnconditionalEffect().getPositiveFluents().toString();
-                for(String fluentId : s.substring(1, s.length()-1).split(" ")){
-                    variables[id].addPosEffect( Integer.parseInt(fluentId) + ((step+1)*midsize) );
+                tempString = actions.get(i).getUnconditionalEffect().getPositiveFluents().toString();
+                for(String fluentId : tempString.substring(1, tempString.length()-1).split(",")){
+                    variables[id].addPosEffect( Integer.parseInt(fluentId.trim()) + ((step+1)*midsize) );
                 }
             }
         }
 
-        int[][] clauses;
+        //add fluents for the final step
+        for(int i=0;i<fluents.size();i++){
+            variables[(estimate-1)*midsize + i] = new SATVar();
+            //fluents have no precond/effect to add
+        }
 
-        //variables is done, we now need to build all the expressions
-        //start with initial state, expression is positivefluents AND negativefluents of initialstate
-        //step 0 fluents are located at the very start of variables.
-        initialState.getPositiveFluents();
-        initialState.getNegativeFluents();
+        //variables are done, we now need to build all the expressions
+        AtomicInteger index = new AtomicInteger(0); 
+        ArrayList<int[]> clauses = new ArrayList();
+        String tempString;
 
-        //goal, expression is (positive fluent and not negativefluents)
+        //INITIALSTATE clauses
+        //expression is (positivefluents and (not fluent")) of initialstate, where fluent" is every fluent not in positivefluent
+        //because we need (x and y), we will make two separate clauses containing respectively (x) and (y)
+        //step 0 fluents are located at the very start of variables, so their id is the same as their fluentid.
+        int[] fluentChecker = new int[fluents.size()];
+        Arrays.fill(fluentChecker,0);
+
+        tempString = problem.getInitialState().getPositiveFluents().toString();
+        if(!tempString.contains("{}")) {
+            for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
+                int[] temp = {Integer.parseInt(fluent.trim())};
+                fluentChecker[Integer.parseInt(fluent.trim())] = 1;
+                clauses.add(index.getAndIncrement(), temp);
+            }
+        }
+
+        //because of the nature of the clause, we simply kept track of which fluent were added in positivefluents and add (not) of the rest
+        for(int i=0 ; i<fluents.size();i++){
+            if(fluentChecker[i]==0){
+                int[] temp = {-1*i};
+                clauses.add(index.getAndIncrement(), temp);
+            }
+        }
+
+        //GOAL clauses
+        //expression is (positive fluent and not negativefluents)
         //fluents for goal are located at the very last step so fluentid + (estimate-1)*midsize
-        problem.getGoal().getPositiveFluents();
-        problem.getGoal().getNegativeFluents();
+        tempString = problem.getGoal().getPositiveFluents().toString();
+        if(!tempString.contains("{}")) {
+            for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
+                int[] temp = {Integer.parseInt(fluent.trim())};
+                clauses.add(index.getAndIncrement(), temp);
+            }
+        }
+        tempString = problem.getGoal().getNegativeFluents().toString();
+        if(!tempString.contains("{}")) {
+            for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
+                int[] temp = {-1*Integer.parseInt(fluent.trim())};
+                clauses.add(index.getAndIncrement(), temp);
+            }
+        }
 
-        //action expressions are of the form A -> B, whichi translates to -A v B
-        //of either we dont have the action, of we have it's consequences.
-        //B is of format {all preconds} and {all positive effects} and {not of all negative effects}
-        //note: effects are on step + 1
-        for(int step=0; step<estimate; step++){
+        //ACTION clauses
+        //expressions are of the form A -> B, which translates to -A v B
+        //A is of format action
+        //B is of format {all preconds} and {effect+} and {not effect-}
+        //so in conclusion, every action creates one clause per member of B, of form (-A v xB)
+        for(int step=0; step<estimate-1; step++){
 
             for(int i=0;i<actions.size();i++){
                 //id of current action in varibles
                 int id = step*midsize + fluents.size() + i;
+                SATVar currVar = variables[id];
+                List<Integer> templist;
+
+                //interate over preconditions for current action
+                templist = currVar.getPreCond();
+                for(int j=0 ; j < templist.size() ; j++){
+                    int[] temp = {-1*id, templist.get(j)}; //(-A v xB)
+                    clauses.add(index.getAndIncrement(), temp);
+                }
+                //interate over positive effects for current action
+                templist = currVar.getPosEffect();
+                for(int j=0 ; j < templist.size() ; j++){
+                    int[] temp = {-1*id, templist.get(j)}; //(-A v xB)
+                    clauses.add(index.getAndIncrement(), temp);
+                }
+                //interate over negatie effects for current action
+                templist = currVar.getNegEffect();
+                for(int j=0 ; j < templist.size() ; j++){
+                    int[] temp = {-1*id, -1*templist.get(j)}; //(-A v xB)
+                    clauses.add(index.getAndIncrement(), temp);
+                }
             }
         }
 
-        //state transitions: if you have fluent at step i and -fluent at ste i+1, construct an expression that is {OR of every actions that could have this effect}
-        //since is fi AND -fi+1 -> B, we end up with -(fi and -fi+1) OR B
-        //dont forget reverse: -fi and fi+1
+        //STATE TRANSITIONS clauses
+        //expressions are of form:
+        //(fi and -fi+1) -> (OR {actions at step i that could result in -fi+1})
+        //(-fi and fi+1) -> (OR {actions at step i that could result in fi+1})
+        //once again, clause of form (A -> B) becomes (-A v B)
+        //also, clause of form -(x and y) becomes ((-x) or (-y))
+        //in the end, our clauses are of form (-fi or fi+1 or {actions}), (fi or -fi+1 or {actions}) 
 
         //-1 steps because we cant have fi, fi+1 if i = max step.
-        for(int step=0; step<estimate; step++){
-
-            
+        for(int step=0; step<estimate-1; step++){
             for(int i=0;i<fluents.size();i++){
-                //if of curent mfluent in variables
+
+                //id of curent fluent in variables
                 int id = step*midsize + i;
+
+                //fi v -fi+1
+                int temp[] = {id, -1*(id+midsize)}; 
+                //iterate over the actions of current step
+                for(int j = step*midsize + fluents.size();j<(step+1)*midsize;j++){
+                    //if the action results in -fi+1, we add it.
+                    if(variables[j].getNegEffect().contains(id+midsize))
+                        temp = Arrays.copyOf(temp, temp.length +1);
+                        temp[temp.length-1] = j;
+                }
+                if(temp.length>2)
+                    clauses.add(index.getAndIncrement(), temp);
+
+                //-fi v fi+1
+                int temp2[] = {-1*id, id+midsize}; 
+                //iterate over the actions of current step
+                for(int j = step*midsize + fluents.size();j<(step+1)*midsize;j++){
+                    //if the action results in fi+1, we add it.
+                    if(variables[j].getPosEffect().contains(id))
+                        temp2 = Arrays.copyOf(temp2, temp2.length +1);
+                        temp2[temp2.length-1] = j;
+                }
+                if(temp2.length>2)
+                    clauses.add(index.getAndIncrement(), temp2);             
             }
         }
 
-        //action disjonction: only one action is true at each step
-        //to confirm: iterate over all action pairs for every step and make expression of form -a OR -b
+        //ACTION DISJONCTION clauses
+        //expressions are of form (-a v -b), with a and b actions possible at step i
+        //we create one clause for every pair of actions, per step.
 
-        //ALL CLAUSES TO BE TRANSALTED TO "OR"
+        for(int step=0; step<estimate-1; step++){
 
-        // Creates the A* search strategy
-        StateSpaceSearch search = StateSpaceSearch.getInstance(SearchStrategy.Name.ASTAR,
-            this.getHeuristic(), this.getHeuristicWeight(), this.getTimeout());
-        LOGGER.info("* Starting A* search \n");
-        // Search a solution
-        Plan plan = search.searchPlan(problem);
-        // If a plan is found update the statistics of the planner and log search information
-        if (plan != null) {
-            LOGGER.info("* A* search succeeded\n");
-            this.getStatistics().setTimeToSearch(search.getSearchingTime());
-            this.getStatistics().setMemoryUsedToSearch(search.getMemoryUsed());
-        } else {
-            LOGGER.info("* A* search failed\n");
+            for(int i=0;i<actions.size();i++){
+
+                int id1 = step*midsize + fluents.size() + i;
+                for(int j=i+1;j<actions.size();j++){
+
+                    int id2 = step*midsize + fluents.size() + j;
+                    int[] temp = {-1*id1, -1*id2};
+                }
+            }
         }
-        // Return the plan found or null if the search fails.
-        return plan;
+
+        //anxiety
+        for(int i=0;i<clauses.size();i++){
+            System.out.println("clause " + i);
+            System.out.print("\t");
+            for(int j=0;j<clauses.get(i).length;j++){
+                System.out.print(clauses.get(i)[j]+", ");
+            }
+            System.out.print("\n"); 
+        }
+
+        final int MAXVAR = 1000000;
+        final int NBCLAUSES = clauses.size();
+
+        ISolver solver = SolverFactory.newDefault();
+
+        // prepare the solver to accept MAXVAR variables. MANDATORY for MAXSAT solving
+        solver.newVar(MAXVAR);
+        solver.setExpectedNumberOfClauses(NBCLAUSES);
+        // Feed the solver using Dimacs format, using arrays of int
+        // (best option to avoid dependencies on SAT4J IVecInt)
+        for (int i=0;i<NBCLAUSES;i++) {
+        int [] clause = clauses.get(i);// get the clause from somewhere
+        // the clause should not contain a 0, only integer (positive or negative)
+        // with absolute values less or equal to MAXVAR
+        // e.g. int [] clause = {1, -3, 7}; is fine
+        // while int [] clause = {1, -3, 7, 0}; is not fine 
+        solver.addClause(new VecInt(clause)); // adapt Array to IVecInt
+        }
+
+        // we are done. Working now on the IProblem interface
+        IProblem endProblem = solver;
+        if (endProblem.isSatisfiable()) {
+            System.out.println("BOY OH BOY");
+        } else {
+            System.out.println("its ok, its ok");
+        }
+        return null;
+
+        // // Creates the A* search strategy
+        // StateSpaceSearch search = StateSpaceSearch.getInstance(SearchStrategy.Name.ASTAR,
+        //     this.getHeuristic(), this.getHeuristicWeight(), this.getTimeout());
+        // LOGGER.info("* Starting A* search \n");
+        // // Search a solution
+        // Plan plan = search.searchPlan(problem);
+        // // If a plan is found update the statistics of the planner and log search information
+        // if (plan != null) {
+        //     LOGGER.info("* A* search succeeded\n");
+        //     this.getStatistics().setTimeToSearch(search.getSearchingTime());
+        //     this.getStatistics().setMemoryUsedToSearch(search.getMemoryUsed());
+        // } else {
+        //     LOGGER.info("* A* search failed\n");
+        // }
+        // // Return the plan found or null if the search fails.
+        // return plan;
     }
 
     /**
