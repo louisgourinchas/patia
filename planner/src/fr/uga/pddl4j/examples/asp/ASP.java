@@ -28,10 +28,10 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.sat4j.specs.ISolver;
-import org.sat4j.minisat.SolverFactory;
 import org.sat4j.core.VecInt;
 import org.sat4j.specs.IProblem;
+import org.sat4j.specs.ISolver;
+import org.sat4j.minisat.SolverFactory;
 /**
  * The class is an example. It shows how to create a simple A* search planner able to
  * solve an ADL problem by choosing the heuristic to used and its weight.
