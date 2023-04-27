@@ -32,6 +32,7 @@ import org.sat4j.core.VecInt;
 import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.minisat.SolverFactory;
+
 /**
  * The class is an example. It shows how to create a simple A* search planner able to
  * solve an ADL problem by choosing the heuristic to used and its weight.
@@ -291,7 +292,7 @@ public class ASP extends AbstractPlanner {
         }
 
         //anxiety
-        for(int i=0;i<clauses.size();i++){
+        for(int i=0;i<100;i++){
             System.out.println("clause " + i);
             System.out.print("\t");
             for(int j=0;j<clauses.get(i).length;j++){
@@ -319,7 +320,7 @@ public class ASP extends AbstractPlanner {
             try {
                 solver.addClause(new VecInt(clause)); // adapt Array to IVecInt
             } catch (Exception e) {
-                e.printStackTrace();
+                //e.printStackTrace();
             }
             
         }
