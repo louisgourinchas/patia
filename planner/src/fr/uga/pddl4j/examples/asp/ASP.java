@@ -15,6 +15,7 @@ import fr.uga.pddl4j.problem.State;
 import fr.uga.pddl4j.problem.operator.Action;
 import fr.uga.pddl4j.util.BitVector;
 
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.plaf.synth.SynthSplitPaneUI;
@@ -310,21 +311,36 @@ public class ASP extends AbstractPlanner {
         // Feed the solver using Dimacs format, using arrays of int
         // (best option to avoid dependencies on SAT4J IVecInt)
         for (int i=0;i<NBCLAUSES;i++) {
-        int [] clause = clauses.get(i);// get the clause from somewhere
-        // the clause should not contain a 0, only integer (positive or negative)
-        // with absolute values less or equal to MAXVAR
-        // e.g. int [] clause = {1, -3, 7}; is fine
-        // while int [] clause = {1, -3, 7, 0}; is not fine 
-        solver.addClause(new VecInt(clause)); // adapt Array to IVecInt
+            int [] clause = clauses.get(i);// get the clause from somewhere
+            // the clause should not contain a 0, only integer (positive or negative)
+            // with absolute values less or equal to MAXVAR
+            // e.g. int [] clause = {1, -3, 7}; is fine
+            // while int [] clause = {1, -3, 7, 0}; is not fine 
+            try {
+                solver.addClause(new VecInt(clause)); // adapt Array to IVecInt
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
         }
 
         // we are done. Working now on the IProblem interface
         IProblem endProblem = solver;
-        if (endProblem.isSatisfiable()) {
-            System.out.println("BOY OH BOY");
-        } else {
-            System.out.println("its ok, its ok");
+        boolean possible;
+
+        try {
+            possible = endProblem.isSatisfiable();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
+
+        if (possible) {
+            System.out.println("succes");
+        } else {
+            System.out.println("fail");
+        } 
+
         return null;
 
         // // Creates the A* search strategy
