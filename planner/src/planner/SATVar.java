@@ -1,4 +1,4 @@
-package fr.uga.pddl4j.examples.asp;
+package planner;
 
 import java.util.List;
 import java.util.ArrayList;

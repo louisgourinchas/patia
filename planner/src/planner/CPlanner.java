@@ -1,10 +1,9 @@
-package fr.uga.pddl4j.examples.asp;
+package planner;
 
 import fr.uga.pddl4j.heuristics.state.FastForward;
 import fr.uga.pddl4j.heuristics.state.StateHeuristic;
 import fr.uga.pddl4j.parser.DefaultParsedProblem;
 import fr.uga.pddl4j.parser.RequireKey;
-import fr.uga.pddl4j.plan.AbstractPlan;
 import fr.uga.pddl4j.plan.Plan;
 import fr.uga.pddl4j.plan.SequentialPlan;
 import fr.uga.pddl4j.planners.AbstractPlanner;
@@ -24,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.sat4j.core.VecInt;
-import org.sat4j.specs.IProblem;
 import org.sat4j.specs.ISolver;
 import org.sat4j.minisat.SolverFactory;
 
@@ -330,7 +328,7 @@ public class CPlanner extends AbstractPlanner {
             //iterate over every action
             for(int i=0;i<actions.size();i++){
 
-                //is is where the action would be in the variables array, 
+                //id is where the action would be in the variables array, 
                 //we look at id+1 because of what we did earlier in order to feed the solver.
                 int id = step*midsize + fluents.size() + i;
 
@@ -340,6 +338,9 @@ public class CPlanner extends AbstractPlanner {
                     finalPlan.add(step, actions.get(i));
                 }
             }
+        }
+        for(Action a : finalPlan.actions()){
+            System.out.println(a.getName());
         }
 
         //Solution

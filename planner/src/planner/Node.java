@@ -1,6 +1,6 @@
 	
 
-package fr.uga.pddl4j.examples.asp;
+package planner;
 
 import fr.uga.pddl4j.problem.State;
 
