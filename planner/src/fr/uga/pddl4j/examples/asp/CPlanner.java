@@ -4,21 +4,16 @@ import fr.uga.pddl4j.heuristics.state.FastForward;
 import fr.uga.pddl4j.heuristics.state.StateHeuristic;
 import fr.uga.pddl4j.parser.DefaultParsedProblem;
 import fr.uga.pddl4j.parser.RequireKey;
+import fr.uga.pddl4j.plan.AbstractPlan;
 import fr.uga.pddl4j.plan.Plan;
+import fr.uga.pddl4j.plan.SequentialPlan;
 import fr.uga.pddl4j.planners.AbstractPlanner;
-import fr.uga.pddl4j.planners.SearchStrategy;
-import fr.uga.pddl4j.planners.statespace.search.StateSpaceSearch;
 import fr.uga.pddl4j.problem.DefaultProblem;
 import fr.uga.pddl4j.problem.Fluent;
 import fr.uga.pddl4j.problem.Problem;
 import fr.uga.pddl4j.problem.State;
 import fr.uga.pddl4j.problem.operator.Action;
-import fr.uga.pddl4j.util.BitVector;
-
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.swing.plaf.synth.SynthSplitPaneUI;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -40,9 +35,9 @@ import org.sat4j.minisat.SolverFactory;
  * @author D. Pellier
  * @version 4.0 - 30.11.2021
  */
-@CommandLine.Command(name = "ASP",
-    version = "ASP 1.0",
-    description = "Solves a specified planning problem using A* search strategy.",
+@CommandLine.Command(name = "CSTM",
+    version = "0.1",
+    description = "Custo planner by louis gourinchas",
     sortOptions = false,
     mixinStandardHelpOptions = true,
     headerHeading = "Usage:%n",
@@ -50,7 +45,7 @@ import org.sat4j.minisat.SolverFactory;
     descriptionHeading = "%nDescription:%n%n",
     parameterListHeading = "%nParameters:%n",
     optionListHeading = "%nOptions:%n")
-public class ASP extends AbstractPlanner {
+public class CPlanner extends AbstractPlanner {
 
     /**
      * The weight of the heuristic.
@@ -65,7 +60,7 @@ public class ASP extends AbstractPlanner {
     /**
      * The class logger.
      */
-    private static final Logger LOGGER = LogManager.getLogger(ASP.class.getName());
+    private static final Logger LOGGER = LogManager.getLogger(CPlanner.class.getName());
 
     /**
      * Instantiates the planning problem from a parsed problem.
@@ -89,20 +84,10 @@ public class ASP extends AbstractPlanner {
     @Override
     public Plan solve(final Problem problem) {
 
-        /* temporary notes on what ive learned
-         * predicates: the actions that can be taken (as in, archetypes of actions)
-         * actions: the actual actions that can be taken (like move x from a to b) with preconditions and effects (conditional or not)
-         * preconditions: set of fluents that must be true for an action to be possible
-         * effects: set of fluents set to true by the action + sets of fluents set to false by the action.
-         * 
-         * I am to construct a list of clauses based on everything from initial state to goal
-        */
-
         //get the estimated number of steps.
         FastForward ff = new FastForward(problem);
         State initialState = new State(problem.getInitialState());
         int estimate = ff.estimate(initialState, problem.getGoal());
-        System.out.println("estimated number of steps from initial state: " + estimate);
 
         //variable initialization
         List<Fluent> fluents = problem.getFluents();
@@ -287,79 +272,78 @@ public class ASP extends AbstractPlanner {
 
                     int id2 = step*midsize + fluents.size() + j;
                     int[] temp = {-1*id1, -1*id2};
+                    clauses.add(index.getAndIncrement(), temp);
                 }
             }
         }
 
-        //anxiety
-        for(int i=0;i<100;i++){
-            System.out.println("clause " + i);
-            System.out.print("\t");
+        //Because the solver does not want any clause with the value 0,
+        //we add 1 to every clause number (this will have to be reversed when interpreting the plan)
+        int[] currClause;
+        for(int i=0;i<clauses.size();i++){
+            currClause = clauses.get(i);
             for(int j=0;j<clauses.get(i).length;j++){
-                System.out.print(clauses.get(i)[j]+", ");
+                currClause[j] = currClause[j]+1;
             }
-            System.out.print("\n"); 
         }
 
-        final int MAXVAR = 1000000;
+        //prepare the sat4j solver
+        final int MAXVAR = variables.length;
         final int NBCLAUSES = clauses.size();
 
         ISolver solver = SolverFactory.newDefault();
-
-        // prepare the solver to accept MAXVAR variables. MANDATORY for MAXSAT solving
         solver.newVar(MAXVAR);
         solver.setExpectedNumberOfClauses(NBCLAUSES);
-        // Feed the solver using Dimacs format, using arrays of int
-        // (best option to avoid dependencies on SAT4J IVecInt)
+
+        //feed all clauses to the solver
         for (int i=0;i<NBCLAUSES;i++) {
-            int [] clause = clauses.get(i);// get the clause from somewhere
-            // the clause should not contain a 0, only integer (positive or negative)
-            // with absolute values less or equal to MAXVAR
-            // e.g. int [] clause = {1, -3, 7}; is fine
-            // while int [] clause = {1, -3, 7, 0}; is not fine 
+            int [] clause = clauses.get(i);
             try {
-                solver.addClause(new VecInt(clause)); // adapt Array to IVecInt
+                solver.addClause(new VecInt(clause)); 
             } catch (Exception e) {
                 //e.printStackTrace();
             }
             
         }
+        //Solver now has the clauses and can generate a model
 
-        // we are done. Working now on the IProblem interface
-        IProblem endProblem = solver;
         boolean possible;
-
         try {
-            possible = endProblem.isSatisfiable();
+            possible = solver.isSatisfiable();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
-
-        if (possible) {
-            System.out.println("succes");
-        } else {
-            System.out.println("fail");
+        if (!possible) {
+            //solver cannot find a solution.
+            return null;
         } 
 
-        return null;
 
-        // // Creates the A* search strategy
-        // StateSpaceSearch search = StateSpaceSearch.getInstance(SearchStrategy.Name.ASTAR,
-        //     this.getHeuristic(), this.getHeuristicWeight(), this.getTimeout());
-        // LOGGER.info("* Starting A* search \n");
-        // // Search a solution
-        // Plan plan = search.searchPlan(problem);
-        // // If a plan is found update the statistics of the planner and log search information
-        // if (plan != null) {
-        //     LOGGER.info("* A* search succeeded\n");
-        //     this.getStatistics().setTimeToSearch(search.getSearchingTime());
-        //     this.getStatistics().setMemoryUsedToSearch(search.getMemoryUsed());
-        // } else {
-        //     LOGGER.info("* A* search failed\n");
-        // }
-        // // Return the plan found or null if the search fails.
-        // return plan;
+        //Solver can find a solution, get to work on converting that solution from a model to a plan
+        //how? Iterate over every action, and look at whether or not it is positive in the model.
+        Plan finalPlan = new SequentialPlan();
+
+        //iterate over every step (except final one, no action to be performed here)
+        for(int step=0; step<estimate-1; step++){
+
+            //iterate over every action
+            for(int i=0;i<actions.size();i++){
+
+                //is is where the action would be in the variables array, 
+                //we look at id+1 because of what we did earlier in order to feed the solver.
+                int id = step*midsize + fluents.size() + i;
+
+                //if it's in the model, add it to the plan
+                //we can assume that only one action will be in the model per step becaue of the disjoinction clauses.
+                if(solver.model(id+1)){
+                    finalPlan.add(step, actions.get(i));
+                }
+            }
+        }
+
+        //Solution
+        return finalPlan;
     }
 
     /**
@@ -369,7 +353,7 @@ public class ASP extends AbstractPlanner {
      */
     public static void main(String[] args) {
         try {
-            final ASP planner = new ASP();
+            final CPlanner planner = new CPlanner();
             CommandLine cmd = new CommandLine(planner);
             cmd.execute(args);
         } catch (IllegalArgumentException e) {
