@@ -27,3 +27,9 @@ java --add-opens java.base/java.lang=ALL-UNNAMED \
 If you want to run a different sokoban level, you need to manually change the file location in [this file](https://github.com/louisgourinchas/patia_rendus/blob/main/sokoban/src/main/java/sokoban/MyMain.java).
 
 ## Custom domains
+
+A few custom domain that we were asked to create during the semester
+
+### Hanoi
+### Npuzzle
+### Graph coloring
