@@ -2,6 +2,24 @@
 
 This repository contains all of the works by Louis Gourinchas for PATIA class, year of 2022-2023.
 
+## Custom SAT Planner
+
+A custom SAT planner to solve pddl problems.
+The planner is currently not working. It will only return one instruction as the plan, or none at all.
+
+You can run the planner with the runningScript (written by [Mattvei](https://github.com/DrankRock)), usage:
+```
+./runningScript <make | run | makerun> [-d domain] [-p problem]
+```
+
+If you want to manually run the planner, run:
+```
+javac -d classes -cp classes:lib/pddl4j-4.0.0.jar:lib/sat4j-sat.jar src/planner/*.java
+
+java -cp classes:lib/pddl4j-4.0.0.jar:lib/sat4j-sat.jar planner.CPlanner src/test/resources/benchmarks/pddl/ipc2002/depots/strips-automatic/domain.pddl src/test/resources/benchmarks/pddl/ipc2002/depots/strips-automatic/p01.pddl
+```
+with the last two arguments being respectively the domain and the problem files.
+
 ## Sokoban
 ### Achieved features
 - A pddl domain allowing us to solve sokoban problems.
