@@ -6,6 +6,7 @@ This repository contains all of the works by Louis Gourinchas for PATIA class, y
 
 A custom SAT planner to solve pddl problems.
 The planner is currently not working. It will only return one instruction as the plan, or none at all.
+The diagnosed problem is that i am trying to build the entire plan at the same time, instead of step by step.
 
 You can run the planner with the runningScript (written by [Mattvei](https://github.com/DrankRock)), usage:
 ```
