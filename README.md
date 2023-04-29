@@ -30,6 +30,6 @@ If you want to run a different sokoban level, you need to manually change the fi
 
 A few custom domain that we were asked to create during the semester
 
-### Hanoi
-### Npuzzle
-### Graph coloring
+- Hanoi
+- Npuzzle
+- Graph coloring
