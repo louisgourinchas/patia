@@ -140,6 +140,9 @@ public class CPlanner extends AbstractPlanner {
         ArrayList<int[]> clauses = new ArrayList();
         String tempString;
 
+        //Because the solver does not handle the "0" element, all of our ids, we add 1
+        //the "+1" comments are to keep track of that change.
+
         //INITIALSTATE clauses
         //expression is (positivefluents and (not fluent")) of initialstate, where fluent" is every fluent not in positivefluent
         //because we need (x and y), we will make two separate clauses containing respectively (x) and (y)
@@ -150,8 +153,9 @@ public class CPlanner extends AbstractPlanner {
         tempString = problem.getInitialState().getPositiveFluents().toString();
         if(!tempString.contains("{}")) {
             for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
-                int[] temp = {Integer.parseInt(fluent.trim())};
+                int[] temp = {Integer.parseInt(fluent.trim()) + 1};//+1
                 fluentChecker[Integer.parseInt(fluent.trim())] = 1;
+                System.out.println("added clause for positive initial fluent " + (Integer.parseInt(fluent.trim())+1));
                 clauses.add(index.getAndIncrement(), temp);
             }
         }
@@ -159,7 +163,8 @@ public class CPlanner extends AbstractPlanner {
         //because of the nature of the clause, we simply kept track of which fluent were added in positivefluents and add (not) of the rest
         for(int i=0 ; i<fluents.size();i++){
             if(fluentChecker[i]==0){
-                int[] temp = {-1*i};
+                int[] temp = {-1*(i+1)};//+1
+                System.out.println("added clause for negative initial fluent " + -1*(i+1));
                 clauses.add(index.getAndIncrement(), temp);
             }
         }
@@ -170,14 +175,18 @@ public class CPlanner extends AbstractPlanner {
         tempString = problem.getGoal().getPositiveFluents().toString();
         if(!tempString.contains("{}")) {
             for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
-                int[] temp = {Integer.parseInt(fluent.trim())};
+                int id = Integer.parseInt(fluent.trim()) + (estimate-1)*midsize + 1;//+1
+                int[] temp = {id};
+                System.out.println("added clause for positive goal fluent " + id);
                 clauses.add(index.getAndIncrement(), temp);
             }
         }
         tempString = problem.getGoal().getNegativeFluents().toString();
         if(!tempString.contains("{}")) {
             for(String fluent : tempString.substring(1, tempString.length()-1).split(",")){
-                int[] temp = {-1*Integer.parseInt(fluent.trim())};
+                int id = -1*(Integer.parseInt(fluent.trim()) + (estimate-1)*midsize + 1);//+1
+                int[] temp = {id};              
+                System.out.println("added clause for negative goal fluent " + id);
                 clauses.add(index.getAndIncrement(), temp);
             }
         }
@@ -189,28 +198,36 @@ public class CPlanner extends AbstractPlanner {
         //so in conclusion, every action creates one clause per member of B, of form (-A v xB)
         for(int step=0; step<estimate-1; step++){
 
+            System.out.println("Adding action clauses for step " + step);
             for(int i=0;i<actions.size();i++){
                 //id of current action in varibles
                 int id = step*midsize + fluents.size() + i;
                 SATVar currVar = variables[id];
                 List<Integer> templist;
+                System.out.println("\tClauses for action " + id + " " + actions.get(i).getName());
 
                 //interate over preconditions for current action
                 templist = currVar.getPreCond();
+                System.out.println("\t\tPreconditions: ");
                 for(int j=0 ; j < templist.size() ; j++){
-                    int[] temp = {-1*id, templist.get(j)}; //(-A v xB)
+                    int[] temp = {-1*(id+1), templist.get(j)+1}; //(-A v xB)        +1
+                    System.out.println("\t\t\t{" + -1*(id+1) +", "+  (templist.get(j)+1) +"}");
                     clauses.add(index.getAndIncrement(), temp);
                 }
                 //interate over positive effects for current action
                 templist = currVar.getPosEffect();
+                System.out.println("\t\tPositive effect clauses: ");
                 for(int j=0 ; j < templist.size() ; j++){
-                    int[] temp = {-1*id, templist.get(j)}; //(-A v xB)
+                    int[] temp = {-1*(id+1), templist.get(j)+1}; //(-A v xB)        +1
+                    System.out.println("\t\t\t{" + -1*(id+1) +", "+  (templist.get(j)+1) +"}");
                     clauses.add(index.getAndIncrement(), temp);
                 }
-                //interate over negatie effects for current action
+                //interate over negative effects for current action
                 templist = currVar.getNegEffect();
+                System.out.println("\t\tNegative effect clauses: ");
                 for(int j=0 ; j < templist.size() ; j++){
-                    int[] temp = {-1*id, -1*templist.get(j)}; //(-A v xB)
+                    int[] temp = {-1*(id+1), -1*(templist.get(j)+1)}; //(-A v xB)   +1
+                    System.out.println("\t\t\t{" + -1*(id+1) +", "+  -1*(templist.get(j)+1) +"}");
                     clauses.add(index.getAndIncrement(), temp);
                 }
             }
@@ -238,7 +255,7 @@ public class CPlanner extends AbstractPlanner {
                     //if the action results in -fi+1, we add it.
                     if(variables[j].getNegEffect().contains(id+midsize))
                         temp = Arrays.copyOf(temp, temp.length +1);
-                        temp[temp.length-1] = j;
+                        temp[temp.length-1] = j+1;                                  //+1
                 }
                 if(temp.length>2)
                     clauses.add(index.getAndIncrement(), temp);
@@ -250,7 +267,7 @@ public class CPlanner extends AbstractPlanner {
                     //if the action results in fi+1, we add it.
                     if(variables[j].getPosEffect().contains(id))
                         temp2 = Arrays.copyOf(temp2, temp2.length +1);
-                        temp2[temp2.length-1] = j;
+                        temp2[temp2.length-1] = j+1;                                //+1
                 }
                 if(temp2.length>2)
                     clauses.add(index.getAndIncrement(), temp2);             
@@ -269,19 +286,9 @@ public class CPlanner extends AbstractPlanner {
                 for(int j=i+1;j<actions.size();j++){
 
                     int id2 = step*midsize + fluents.size() + j;
-                    int[] temp = {-1*id1, -1*id2};
+                    int[] temp = {-1*(id1+1), -1*(id2+1)};
                     clauses.add(index.getAndIncrement(), temp);
                 }
-            }
-        }
-
-        //Because the solver does not want any clause with the value 0,
-        //we add 1 to every clause number (this will have to be reversed when interpreting the plan)
-        int[] currClause;
-        for(int i=0;i<clauses.size();i++){
-            currClause = clauses.get(i);
-            for(int j=0;j<clauses.get(i).length;j++){
-                currClause[j] = currClause[j]+1;
             }
         }
 
